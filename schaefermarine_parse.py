@@ -22,17 +22,16 @@ def fetch_html_content(url: str, headers: dict) -> BeautifulSoup | None:
         return None
 
 
-def getting_product_category_links(soup: BeautifulSoup, url: str) -> list:
-    product_categories = soup.find('span', string='Product Categories')
-
+def getting_product_category_links(soup: BeautifulSoup, url: str, menu_section: list) -> list:
     list_category_links = []
 
-    if product_categories:
-        # Найти все ссылки внутри списка
-        all_links = product_categories.find_next('ul', class_='widemenu').find_all('a', class_='widemenu__link')
+    for section in menu_section:
+        product_section = soup.find('span', string=section)
 
-        for link in all_links:
-            list_category_links.append(f'{url.rstrip("/")}{link["href"]}')
+        if product_section:
+            # Найти все ссылки внутри списка
+            all_links = product_section.find_next('ul', class_='widemenu').find_all('a', class_='widemenu__link')
+            list_category_links.extend(f'{url.rstrip("/")}{link["href"]}' for link in all_links)
 
     return list_category_links
 
@@ -67,8 +66,10 @@ def main():
         'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
     }
 
+    menu_section = ['Product Categories', 'Partner Products']
+
     soup = fetch_html_content(base_url, headers)
-    all_product_category_links = getting_product_category_links(soup, base_url)
+    all_product_category_links = getting_product_category_links(soup, base_url, menu_section)
     all_links_to_category_pages = getting_category_page_links(base_url, headers, all_product_category_links)
 
     count = 1
