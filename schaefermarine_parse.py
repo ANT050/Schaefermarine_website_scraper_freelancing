@@ -59,6 +59,21 @@ def getting_category_page_links(base_url: str, headers: dict, category_links: li
     return links_to_category_pages
 
 
+def get_links_to_products(category_pages: list, base_url: str, headers: dict) -> list:
+    links_to_products = []
+
+    for page in category_pages:
+        soup = fetch_html_content(page, headers)
+        all_url_product = soup.find_all('div', class_='thumbnail-overlay')
+
+        if all_url_product:
+            links_to_products.extend(f'{base_url.rstrip("/")}{url.find("a")["href"]}' for url in all_url_product)
+        else:
+            links_to_products.append(page)
+
+    return links_to_products
+
+
 def main():
     base_url = 'https://hardware.schaefermarine.com/'
     headers = {
@@ -71,9 +86,10 @@ def main():
     soup = fetch_html_content(base_url, headers)
     all_product_category_links = getting_product_category_links(soup, base_url, menu_section)
     all_links_to_category_pages = getting_category_page_links(base_url, headers, all_product_category_links)
+    links_to_products = get_links_to_products(all_links_to_category_pages, base_url, headers)
 
     count = 1
-    for i in all_links_to_category_pages:
+    for i in links_to_products:
         print(f'{count}. {i}')
         count += 1
 
