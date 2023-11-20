@@ -1,5 +1,8 @@
+import concurrent.futures
+
 import requests
 from bs4 import BeautifulSoup
+import pandas as pd
 
 
 def fetch_html_content(url: str, headers: dict) -> BeautifulSoup | None:
@@ -22,10 +25,11 @@ def fetch_html_content(url: str, headers: dict) -> BeautifulSoup | None:
         return None
 
 
-def getting_product_category_links(soup: BeautifulSoup, url: str, menu_section: list) -> list:
+def getting_product_category_links(url: str, headers: dict, menu_section: list) -> list:
     list_category_links = []
 
     for section in menu_section:
+        soup = fetch_html_content(url, headers)
         product_section = soup.find('span', string=section)
 
         if product_section:
@@ -74,6 +78,41 @@ def get_links_to_products(category_pages: list, base_url: str, headers: dict) ->
     return links_to_products
 
 
+def extract_product_data(url: str, headers: dict) -> dict:
+    soup = fetch_html_content(url, headers)
+
+    title = soup.find('div', class_='product-block--title').text.split()
+    product_name = ' '.join(title[:-1])
+    product_number = soup.find('div', class_='product-block--sku').text.strip()
+    product_price = soup.find('div', class_='price-ui').find_next('span', class_='price').text
+    product_description = soup.find('div', class_='rte').text.strip().replace('\n', ' ')
+
+    product_data = {
+        'Product name': product_name,
+        'Product number': product_number,
+        'Product price': product_price,
+        'Product description': product_description,
+        'Product url': url
+    }
+
+    return product_data
+
+
+def threaded_get_product_info(urls: list, headers: dict, num_threads: int = 5) -> list:
+    all_products_data = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
+        # Запуск функцию extract_product_data для каждого URL в отдельном потоке
+        futures = {executor.submit(extract_product_data, url, headers): url for url in urls}
+
+        # Обрабатка результата по мере их завершения
+        for future in concurrent.futures.as_completed(futures):
+            result_data = future.result()
+            all_products_data.append(result_data)
+
+    return all_products_data
+
+
 def main():
     base_url = 'https://hardware.schaefermarine.com/'
     headers = {
@@ -82,16 +121,12 @@ def main():
     }
 
     menu_section = ['Product Categories', 'Partner Products']
+    number_threads = 13
 
-    soup = fetch_html_content(base_url, headers)
-    all_product_category_links = getting_product_category_links(soup, base_url, menu_section)
+    all_product_category_links = getting_product_category_links(base_url, headers, menu_section)
     all_links_to_category_pages = getting_category_page_links(base_url, headers, all_product_category_links)
     links_to_products = get_links_to_products(all_links_to_category_pages, base_url, headers)
-
-    count = 1
-    for i in links_to_products:
-        print(f'{count}. {i}')
-        count += 1
+    threaded_get_product_info(links_to_products, headers, number_threads)
 
 
 if __name__ == '__main__':
