@@ -1,4 +1,5 @@
 import concurrent.futures
+import json
 
 import requests
 from bs4 import BeautifulSoup
@@ -113,6 +114,23 @@ def threaded_get_product_info(urls: list, headers: dict, num_threads: int = 5) -
     return all_products_data
 
 
+def write_to_csv(data: list, filename: str) -> None:
+    df = pd.DataFrame(data)
+    df.columns = [
+        'Product name',
+        'Product number',
+        'Product price',
+        'Product description',
+        'Product url',
+    ]
+    df.to_csv(filename, index=False)
+
+
+def write_to_json(data: list, filename: str) -> None:
+    with open(filename, 'w', encoding='utf-8') as json_file:
+        json.dump(data, json_file, ensure_ascii=False, indent=4)
+
+
 def main():
     base_url = 'https://hardware.schaefermarine.com/'
     headers = {
@@ -126,7 +144,10 @@ def main():
     all_product_category_links = getting_product_category_links(base_url, headers, menu_section)
     all_links_to_category_pages = getting_category_page_links(base_url, headers, all_product_category_links)
     links_to_products = get_links_to_products(all_links_to_category_pages, base_url, headers)
-    threaded_get_product_info(links_to_products, headers, number_threads)
+    products_info = threaded_get_product_info(links_to_products, headers, number_threads)
+
+    write_to_csv(products_info, 'Schaefermarine_website.csv')
+    write_to_json(products_info, 'Schaefermarine_website.json')
 
 
 if __name__ == '__main__':
